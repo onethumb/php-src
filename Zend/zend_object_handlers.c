@@ -46,6 +46,9 @@
 #define IN_ISSET	ZEND_GUARD_PROPERTY_ISSET
 #define IN_HOOK		ZEND_GUARD_PROPERTY_HOOK
 
+static zend_arg_info zend_call_trampoline_arginfo[1] = {{0}};
+static zend_arg_info zend_property_hook_arginfo[1] = {{0}};
+
 static zend_always_inline bool zend_objects_check_stack_limit(void)
 {
 #ifdef ZEND_CHECK_STACK_LIMIT
@@ -106,8 +109,7 @@ ZEND_API HashTable *rebuild_object_properties_internal(zend_object *zobj) /* {{{
 /* Implements the fast path for array cast */
 ZEND_API HashTable *zend_std_build_object_properties_array(zend_object *zobj) /* {{{ */
 {
-	zend_property_info *prop_info;
-	zend_class_entry *ce = zobj->ce;
+	const zend_class_entry *ce = zobj->ce;
 	HashTable *ht;
 	zval* prop;
 	int i;
@@ -118,7 +120,7 @@ ZEND_API HashTable *zend_std_build_object_properties_array(zend_object *zobj) /*
 	if (ce->default_properties_count) {
 		zend_hash_real_init_mixed(ht);
 		for (i = 0; i < ce->default_properties_count; i++) {
-			prop_info = ce->properties_info_table[i];
+			const zend_property_info *prop_info = ce->properties_info_table[i];
 
 			if (!prop_info) {
 				continue;
@@ -192,7 +194,7 @@ ZEND_API HashTable *zend_std_get_gc(zend_object *zobj, zval **table, int *n) /* 
 
 ZEND_API HashTable *zend_std_get_debug_info(zend_object *object, int *is_temp) /* {{{ */
 {
-	zend_class_entry *ce = object->ce;
+	const zend_class_entry *ce = object->ce;
 	zval retval;
 	HashTable *ht;
 
@@ -334,7 +336,7 @@ static ZEND_COLD zend_never_inline bool zend_deprecated_dynamic_property(
 	zend_error(E_DEPRECATED, "Creation of dynamic property %s::$%s is deprecated",
 		ZSTR_VAL(obj->ce->name), ZSTR_VAL(member));
 	if (UNEXPECTED(GC_DELREF(obj) == 0)) {
-		zend_class_entry *ce = obj->ce;
+		const zend_class_entry *ce = obj->ce;
 		zend_objects_store_del(obj);
 		if (!EG(exception)) {
 			/* We cannot continue execution and have to throw an exception */
@@ -347,7 +349,7 @@ static ZEND_COLD zend_never_inline bool zend_deprecated_dynamic_property(
 }
 
 static ZEND_COLD zend_never_inline void zend_readonly_property_unset_error(
-		zend_class_entry *ce, zend_string *member) {
+		const zend_class_entry *ce, const zend_string *member) {
 	zend_throw_error(NULL, "Cannot unset readonly property %s::$%s",
 		ZSTR_VAL(ce->name), ZSTR_VAL(member));
 }
@@ -711,7 +713,7 @@ static bool zend_should_call_hook(const zend_property_info *prop_info, const zen
 	return true;
 }
 
-static ZEND_COLD void zend_throw_no_prop_backing_value_access(zend_string *class_name, zend_string *prop_name, bool is_read)
+static ZEND_COLD void zend_throw_no_prop_backing_value_access(const zend_string *class_name, const zend_string *prop_name, bool is_read)
 {
 	zend_throw_error(NULL, "Must not %s virtual property %s::$%s",
 		is_read ? "read from" : "write to",
@@ -719,7 +721,7 @@ static ZEND_COLD void zend_throw_no_prop_backing_value_access(zend_string *class
 }
 
 static bool zend_call_get_hook(
-	const zend_property_info *prop_info, zend_string *prop_name,
+	const zend_property_info *prop_info, const zend_string *prop_name,
 	zend_function *get, zend_object *zobj, zval *rv)
 {
 	if (!zend_should_call_hook(prop_info, zobj)) {
@@ -842,7 +844,7 @@ try_again:
 			goto exit;
 		}
 
-		zend_class_entry *ce = zobj->ce;
+		const zend_class_entry *ce = zobj->ce;
 
 		if (!zend_call_get_hook(prop_info, name, get, zobj, rv)) {
 			if (EG(exception)) {
@@ -850,7 +852,7 @@ try_again:
 			}
 
 			/* Reads from backing store can only occur in hooks, and hence will always remain simple. */
-			zend_execute_data *execute_data = EG(current_execute_data);
+			const zend_execute_data *execute_data = EG(current_execute_data);
 			if (cache_slot && EX(opline) && EX(opline)->opcode == ZEND_FETCH_OBJ_R && EX(opline)->op1_type == IS_UNUSED) {
 				ZEND_SET_PROPERTY_HOOK_SIMPLE_READ(cache_slot);
 			}
@@ -1274,7 +1276,7 @@ lazy_init:
 }
 /* }}} */
 
-static ZEND_COLD zend_never_inline void zend_bad_array_access(zend_class_entry *ce) /* {{{ */
+static ZEND_COLD zend_never_inline void zend_bad_array_access(const zend_class_entry *ce) /* {{{ */
 {
 	zend_throw_error(NULL, "Cannot use object of type %s as array", ZSTR_VAL(ce->name));
 }
@@ -1282,7 +1284,7 @@ static ZEND_COLD zend_never_inline void zend_bad_array_access(zend_class_entry *
 
 ZEND_API zval *zend_std_read_dimension(zend_object *object, zval *offset, int type, zval *rv) /* {{{ */
 {
-	zend_class_entry *ce = object->ce;
+	const zend_class_entry *ce = object->ce;
 	zval tmp_offset;
 
 	/* arrayaccess_funcs_ptr is set if (and only if) the class implements zend_ce_arrayaccess */
@@ -1333,7 +1335,7 @@ ZEND_API zval *zend_std_read_dimension(zend_object *object, zval *offset, int ty
 
 ZEND_API void zend_std_write_dimension(zend_object *object, zval *offset, zval *value) /* {{{ */
 {
-	zend_class_entry *ce = object->ce;
+	const zend_class_entry *ce = object->ce;
 	zval tmp_offset;
 
 	zend_class_arrayaccess_funcs *funcs = ce->arrayaccess_funcs_ptr;
@@ -1356,7 +1358,7 @@ ZEND_API void zend_std_write_dimension(zend_object *object, zval *offset, zval *
 // todo: make zend_std_has_dimension return bool as well
 ZEND_API int zend_std_has_dimension(zend_object *object, zval *offset, int check_empty) /* {{{ */
 {
-	zend_class_entry *ce = object->ce;
+	const zend_class_entry *ce = object->ce;
 	zval retval, tmp_offset;
 	bool result;
 
@@ -1610,7 +1612,7 @@ ZEND_API void zend_std_unset_property(zend_object *zobj, zend_string *name, void
 
 ZEND_API void zend_std_unset_dimension(zend_object *object, zval *offset) /* {{{ */
 {
-	zend_class_entry *ce = object->ce;
+	const zend_class_entry *ce = object->ce;
 	zval tmp_offset;
 
 	zend_class_arrayaccess_funcs *funcs = ce->arrayaccess_funcs_ptr;
@@ -1626,7 +1628,7 @@ ZEND_API void zend_std_unset_dimension(zend_object *object, zval *offset) /* {{{
 }
 /* }}} */
 
-static zend_never_inline zend_function *zend_get_parent_private_method(zend_class_entry *scope, zend_class_entry *ce, zend_string *function_name) /* {{{ */
+static zend_never_inline zend_function *zend_get_parent_private_method(const zend_class_entry *scope, const zend_class_entry *ce, zend_string *function_name) /* {{{ */
 {
 	zval *func;
 	zend_function *fbc;
@@ -1674,18 +1676,16 @@ ZEND_API bool zend_check_protected(const zend_class_entry *ce, const zend_class_
 }
 /* }}} */
 
-ZEND_API zend_function *zend_get_call_trampoline_func(const zend_class_entry *ce, zend_string *method_name, bool is_static) /* {{{ */
+ZEND_API ZEND_ATTRIBUTE_NONNULL zend_function *zend_get_call_trampoline_func(
+	const zend_function *fbc, zend_string *method_name) /* {{{ */
 {
 	size_t mname_len;
 	zend_op_array *func;
-	zend_function *fbc = is_static ? ce->__callstatic : ce->__call;
 	/* We use non-NULL value to avoid useless run_time_cache allocation.
 	 * The low bit must be zero, to not be interpreted as a MAP_PTR offset.
 	 */
 	static const void *dummy = (void*)(intptr_t)2;
 	static const zend_arg_info arg_info[1] = {{0}};
-
-	ZEND_ASSERT(fbc);
 
 	if (EXPECTED(EG(trampoline).common.function_name == NULL)) {
 		func = &EG(trampoline).op_array;
@@ -1700,13 +1700,10 @@ ZEND_API zend_function *zend_get_call_trampoline_func(const zend_class_entry *ce
 	func->fn_flags = ZEND_ACC_CALL_VIA_TRAMPOLINE
 		| ZEND_ACC_PUBLIC
 		| ZEND_ACC_VARIADIC
-		| (fbc->common.fn_flags & (ZEND_ACC_RETURN_REFERENCE|ZEND_ACC_ABSTRACT|ZEND_ACC_DEPRECATED|ZEND_ACC_NODISCARD));
+		| (fbc->common.fn_flags & (ZEND_ACC_RETURN_REFERENCE|ZEND_ACC_ABSTRACT|ZEND_ACC_DEPRECATED|ZEND_ACC_NODISCARD|ZEND_ACC_STATIC));
 	func->fn_flags2 = 0;
 	/* Attributes outlive the trampoline because they are created by the compiler. */
 	func->attributes = fbc->common.attributes;
-	if (is_static) {
-		func->fn_flags |= ZEND_ACC_STATIC;
-	}
 	func->opcodes = &EG(call_trampoline_op);
 	ZEND_MAP_PTR_INIT(func->run_time_cache, (void**)dummy);
 	func->scope = fbc->common.scope;
@@ -1752,7 +1749,7 @@ static ZEND_FUNCTION(zend_parent_hook_get_trampoline)
 	}
 
 	zval rv;
-	zval *retval = obj->handlers->read_property(obj, prop_name, BP_VAR_R, NULL, &rv);
+	const zval *retval = obj->handlers->read_property(obj, prop_name, BP_VAR_R, NULL, &rv);
 	if (retval == &rv) {
 		RETVAL_COPY_VALUE(retval);
 	} else {
@@ -1788,9 +1785,6 @@ ZEND_API zend_function *zend_get_property_hook_trampoline(
 	const zend_property_info *prop_info,
 	zend_property_hook_kind kind, zend_string *prop_name)
 {
-	static const zend_internal_arg_info arg_info[2] = {
-		{ .name = "value" }
-	};
 	zend_function *func;
 	if (EXPECTED(EG(trampoline).common.function_name == NULL)) {
 		func = &EG(trampoline);
@@ -1816,7 +1810,7 @@ ZEND_API zend_function *zend_get_property_hook_trampoline(
 	func->common.scope = prop_info->ce;
 	func->common.prototype = NULL;
 	func->common.prop_info = prop_info;
-	func->common.arg_info = (zend_arg_info *) arg_info;
+	func->common.arg_info = zend_property_hook_arginfo;
 	func->internal_function.handler = kind == ZEND_PROPERTY_HOOK_GET
 		? ZEND_FN(zend_parent_hook_get_trampoline)
 		: ZEND_FN(zend_parent_hook_set_trampoline);
@@ -1827,12 +1821,6 @@ ZEND_API zend_function *zend_get_property_hook_trampoline(
 
 	return func;
 }
-
-static zend_always_inline zend_function *zend_get_user_call_function(zend_class_entry *ce, zend_string *method_name) /* {{{ */
-{
-	return zend_get_call_trampoline_func(ce, method_name, false);
-}
-/* }}} */
 
 ZEND_API ZEND_COLD zend_never_inline void zend_bad_method_call(const zend_function *fbc, const zend_string *method_name, const zend_class_entry *scope) /* {{{ */
 {
@@ -1857,7 +1845,6 @@ ZEND_API zend_function *zend_std_get_method(zend_object **obj_ptr, zend_string *
 	zval *func;
 	zend_function *fbc;
 	zend_string *lc_method_name;
-	zend_class_entry *scope;
 	ALLOCA_FLAG(use_heap);
 
 	if (EXPECTED(key != NULL)) {
@@ -1875,7 +1862,7 @@ ZEND_API zend_function *zend_std_get_method(zend_object **obj_ptr, zend_string *
 			ZSTR_ALLOCA_FREE(lc_method_name, use_heap);
 		}
 		if (zobj->ce->__call) {
-			return zend_get_user_call_function(zobj->ce, method_name);
+			return zend_get_call_trampoline_func(zobj->ce->__call, method_name);
 		} else {
 			return NULL;
 		}
@@ -1885,7 +1872,7 @@ ZEND_API zend_function *zend_std_get_method(zend_object **obj_ptr, zend_string *
 
 	/* Check access level */
 	if (fbc->op_array.fn_flags & (ZEND_ACC_CHANGED|ZEND_ACC_PRIVATE|ZEND_ACC_PROTECTED)) {
-		scope = zend_get_executed_scope();
+		const zend_class_entry *scope = zend_get_executed_scope();
 
 		if (fbc->common.scope != scope) {
 			if (fbc->op_array.fn_flags & ZEND_ACC_CHANGED) {
@@ -1901,7 +1888,7 @@ ZEND_API zend_function *zend_std_get_method(zend_object **obj_ptr, zend_string *
 			if (UNEXPECTED(fbc->op_array.fn_flags & ZEND_ACC_PRIVATE)
 			 || UNEXPECTED(!zend_check_protected(zend_get_function_root_class(fbc), scope))) {
 				if (zobj->ce->__call) {
-					fbc = zend_get_user_call_function(zobj->ce, method_name);
+					fbc = zend_get_call_trampoline_func(zobj->ce->__call, method_name);
 				} else {
 					zend_bad_method_call(fbc, method_name, scope);
 					fbc = NULL;
@@ -1922,14 +1909,8 @@ exit:
 }
 /* }}} */
 
-static zend_always_inline zend_function *zend_get_user_callstatic_function(zend_class_entry *ce, zend_string *method_name) /* {{{ */
-{
-	return zend_get_call_trampoline_func(ce, method_name, true);
-}
-/* }}} */
-
 static zend_always_inline zend_function *get_static_method_fallback(
-		zend_class_entry *ce, zend_string *function_name)
+		const zend_class_entry *ce, zend_string *function_name)
 {
 	zend_object *object;
 	if (ce->__call &&
@@ -1939,15 +1920,15 @@ static zend_always_inline zend_function *get_static_method_fallback(
 		 * see: tests/classes/__call_004.phpt  */
 
 		ZEND_ASSERT(object->ce->__call);
-		return zend_get_user_call_function(object->ce, function_name);
+		return zend_get_call_trampoline_func(object->ce->__call, function_name);
 	} else if (ce->__callstatic) {
-		return zend_get_user_callstatic_function(ce, function_name);
+		return zend_get_call_trampoline_func(ce->__callstatic, function_name);
 	} else {
 		return NULL;
 	}
 }
 
-ZEND_API zend_function *zend_std_get_static_method(zend_class_entry *ce, zend_string *function_name, const zval *key) /* {{{ */
+ZEND_API zend_function *zend_std_get_static_method(const zend_class_entry *ce, zend_string *function_name, const zval *key) /* {{{ */
 {
 	zend_string *lc_function_name;
 	if (EXPECTED(key != NULL)) {
@@ -1961,7 +1942,7 @@ ZEND_API zend_function *zend_std_get_static_method(zend_class_entry *ce, zend_st
 	if (EXPECTED(func)) {
 		fbc = Z_FUNC_P(func);
 		if (!(fbc->common.fn_flags & ZEND_ACC_PUBLIC)) {
-			zend_class_entry *scope = zend_get_executed_scope();
+			const zend_class_entry *scope = zend_get_executed_scope();
 			ZEND_ASSERT(!(fbc->common.fn_flags & ZEND_ACC_PUBLIC));
 			if (!zend_check_method_accessible(fbc, scope)) {
 				zend_function *fallback_fbc = get_static_method_fallback(ce, function_name);
@@ -2459,7 +2440,7 @@ ZEND_API zend_result zend_std_cast_object_tostring(zend_object *readobj, zval *w
 {
 	switch (type) {
 		case IS_STRING: {
-			zend_class_entry *ce = readobj->ce;
+			const zend_class_entry *ce = readobj->ce;
 			if (ce->__tostring) {
 				zval retval;
 				GC_ADDREF(readobj);
@@ -2492,7 +2473,7 @@ is_string:
 ZEND_API zend_result zend_std_get_closure(zend_object *obj, zend_class_entry **ce_ptr, zend_function **fptr_ptr, zend_object **obj_ptr, bool check_only) /* {{{ */
 {
 	zend_class_entry *ce = obj->ce;
-	zval *func = zend_hash_find_known_hash(&ce->function_table, ZSTR_KNOWN(ZEND_STR_MAGIC_INVOKE));
+	const zval *func = zend_hash_find_known_hash(&ce->function_table, ZSTR_KNOWN(ZEND_STR_MAGIC_INVOKE));
 
 	if (func == NULL) {
 		return FAILURE;
@@ -2593,3 +2574,8 @@ ZEND_API const zend_object_handlers std_object_handlers = {
 	zend_std_compare_objects,				/* compare */
 	NULL,									/* get_properties_for */
 };
+
+void zend_object_handlers_startup(void) {
+	zend_call_trampoline_arginfo[0].name = ZSTR_KNOWN(ZEND_STR_ARGS);
+	zend_property_hook_arginfo[0].name = ZSTR_KNOWN(ZEND_STR_VALUE);
+}

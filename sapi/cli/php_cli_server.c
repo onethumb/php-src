@@ -304,7 +304,7 @@ static int status_comp(const void *a, const void *b) /* {{{ */
 
 static const char *get_status_string(int code) /* {{{ */
 {
-	http_response_status_code_pair needle = {code, NULL},
+	const http_response_status_code_pair needle = {code, NULL},
 		*result = NULL;
 
 	result = bsearch(&needle, http_status_map, http_status_map_len, sizeof(needle), status_comp);
@@ -395,13 +395,7 @@ static void append_essential_headers(smart_str* buffer, php_cli_server_client *c
 
 static const char *get_mime_type(const php_cli_server *server, const char *ext, size_t ext_len) /* {{{ */
 {
-	char *ret;
-	ALLOCA_FLAG(use_heap)
-	char *ext_lower = do_alloca(ext_len + 1, use_heap);
-	zend_str_tolower_copy(ext_lower, ext, ext_len);
-	ret = zend_hash_str_find_ptr(&server->extension_mime_types, ext_lower, ext_len);
-	free_alloca(ext_lower, use_heap);
-	return (const char*)ret;
+	return zend_hash_str_find_ptr_lc(&server->extension_mime_types, ext, ext_len);
 } /* }}} */
 
 PHP_FUNCTION(apache_request_headers) /* {{{ */

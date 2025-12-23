@@ -116,7 +116,8 @@ static const enum mbfl_no_encoding php_mb_default_identify_list_cn[] = {
 	mbfl_no_encoding_ascii,
 	mbfl_no_encoding_utf8,
 	mbfl_no_encoding_euc_cn,
-	mbfl_no_encoding_cp936
+	mbfl_no_encoding_cp936,
+	mbfl_no_encoding_gb18030_2022
 };
 
 static const enum mbfl_no_encoding php_mb_default_identify_list_tw_hk[] = {
@@ -718,6 +719,11 @@ static PHP_INI_MH(OnUpdate_mbstring_detect_order)
 	}
 	MBSTRG(detect_order_list) = list;
 	MBSTRG(detect_order_list_size) = size;
+
+	if (stage == PHP_INI_STAGE_RUNTIME) {
+		php_mb_populate_current_detect_order_list();
+	}
+
 	return SUCCESS;
 }
 /* }}} */
@@ -5578,19 +5584,16 @@ static bool mb_check_str_encoding(zend_string *str, const mbfl_encoding *encodin
 
 static bool php_mb_check_encoding_recursive(HashTable *vars, const mbfl_encoding *encoding)
 {
-	zend_long idx;
 	zend_string *key;
 	zval *entry;
 	bool valid = true;
-
-	(void)(idx); /* Suppress spurious compiler warning that `idx` is not used */
 
 	if (GC_IS_RECURSIVE(vars)) {
 		php_error_docref(NULL, E_WARNING, "Cannot not handle circular references");
 		return false;
 	}
 	GC_TRY_PROTECT_RECURSION(vars);
-	ZEND_HASH_FOREACH_KEY_VAL(vars, idx, key, entry) {
+	ZEND_HASH_FOREACH_STR_KEY_VAL(vars, key, entry) {
 		ZVAL_DEREF(entry);
 		if (key) {
 			if (!mb_check_str_encoding(key, encoding)) {
@@ -5984,6 +5987,11 @@ static void php_mb_populate_current_detect_order_list(void)
 			entry[i] = mbfl_no2encoding(src[i]);
 		}
 	}
+
+	if (MBSTRG(current_detect_order_list) != NULL) {
+		efree(ZEND_VOIDP(MBSTRG(current_detect_order_list)));
+	}
+
 	MBSTRG(current_detect_order_list) = entry;
 	MBSTRG(current_detect_order_list_size) = nentries;
 }
@@ -6667,13 +6675,15 @@ static zend_string* mb_mime_header_decode(zend_string *input, const mbfl_encodin
 					p = temp;
 					/* Decoding of MIME encoded word was successful;
 					 * Try to collapse a run of whitespace */
-					if (p < e && (*p == '\n' || *p == '\r')) {
+					if (p < e && (*p == '\n' || *p == '\r' || *p == '\t' || *p == ' ')) {
 						do {
 							p++;
 						} while (p < e && (*p == '\n' || *p == '\r' || *p == '\t' || *p == ' '));
 						/* We will only actually output a space if this is not immediately followed
 						 * by another valid encoded word */
 						space_pending = true;
+					} else {
+						space_pending = false;
 					}
 					continue;
 				}

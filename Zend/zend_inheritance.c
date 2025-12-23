@@ -953,18 +953,14 @@ static ZEND_COLD zend_string *zend_get_function_declaration(
 			}
 
 			smart_str_appendc(&str, '$');
-			if (fptr->type == ZEND_INTERNAL_FUNCTION) {
-				smart_str_appends(&str, ((zend_internal_arg_info*)arg_info)->name);
-			} else {
-				smart_str_appendl(&str, ZSTR_VAL(arg_info->name), ZSTR_LEN(arg_info->name));
-			}
+			smart_str_append(&str, arg_info->name);
 
 			if (i >= required && !ZEND_ARG_IS_VARIADIC(arg_info)) {
 				smart_str_appends(&str, " = ");
 
 				if (fptr->type == ZEND_INTERNAL_FUNCTION) {
-					if (((zend_internal_arg_info*)arg_info)->default_value) {
-						smart_str_appends(&str, ((zend_internal_arg_info*)arg_info)->default_value);
+					if (arg_info->default_value) {
+						smart_str_append(&str, arg_info->default_value);
 					} else {
 						smart_str_appends(&str, "<default>");
 					}
@@ -1011,7 +1007,9 @@ static ZEND_COLD zend_string *zend_get_function_declaration(
 							zend_ast *ast = Z_ASTVAL_P(zv);
 							if (ast->kind == ZEND_AST_CONSTANT) {
 								smart_str_append(&str, zend_ast_get_constant_name(ast));
-							} else if (ast->kind == ZEND_AST_CLASS_CONST) {
+							} else if (ast->kind == ZEND_AST_CLASS_CONST
+							 && ast->child[1]->kind == ZEND_AST_ZVAL
+							 && Z_TYPE_P(zend_ast_get_zval(ast->child[1])) == IS_STRING) {
 								smart_str_append(&str, zend_ast_get_str(ast->child[0]));
 								smart_str_appends(&str, "::");
 								smart_str_append(&str, zend_ast_get_str(ast->child[1]));

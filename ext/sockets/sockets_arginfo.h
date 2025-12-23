@@ -1,5 +1,5 @@
 /* This is a generated file, edit the .stub.php file instead.
- * Stub hash: 7b1baf47dce2fb08faa5616068238ea078d1609b */
+ * Stub hash: 038081ca7bb98076d4b559d93b4c9300acc47160 */
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_MASK_EX(arginfo_socket_select, 0, 4, MAY_BE_LONG|MAY_BE_FALSE)
 	ZEND_ARG_TYPE_INFO(1, read, IS_ARRAY, 1)
@@ -527,6 +527,9 @@ static void register_sockets_symbols(int module_number)
 #if defined(TCP_SYNCNT)
 	REGISTER_LONG_CONSTANT("TCP_SYNCNT", TCP_SYNCNT, CONST_PERSISTENT);
 #endif
+#if defined(TCP_USER_TIMEOUT)
+	REGISTER_LONG_CONSTANT("TCP_USER_TIMEOUT", TCP_USER_TIMEOUT, CONST_PERSISTENT);
+#endif
 #if defined(SO_ZEROCOPY)
 	REGISTER_LONG_CONSTANT("SO_ZEROCOPY", SO_ZEROCOPY, CONST_PERSISTENT);
 #endif
@@ -544,7 +547,11 @@ static void register_sockets_symbols(int module_number)
 #endif
 #if defined(TCP_KEEPIDLE)
 	REGISTER_LONG_CONSTANT("TCP_KEEPIDLE", TCP_KEEPIDLE, CONST_PERSISTENT);
+#endif
+#if defined(TCP_KEEPINTVL)
 	REGISTER_LONG_CONSTANT("TCP_KEEPINTVL", TCP_KEEPINTVL, CONST_PERSISTENT);
+#endif
+#if defined(TCP_KEEPCNT)
 	REGISTER_LONG_CONSTANT("TCP_KEEPCNT", TCP_KEEPCNT, CONST_PERSISTENT);
 #endif
 #if defined(TCP_FUNCTION_BLK)

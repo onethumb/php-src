@@ -602,6 +602,13 @@ const TCP_CONGESTION = UNKNOWN;
  */
 const TCP_SYNCNT = UNKNOWN;
 #endif
+#ifdef TCP_USER_TIMEOUT
+/**
+ * @var int
+ * @cvalue TCP_USER_TIMEOUT
+ */
+const TCP_USER_TIMEOUT = UNKNOWN;
+#endif
 #ifdef SO_ZEROCOPY
 /**
  * @var int
@@ -643,11 +650,15 @@ const TCP_KEEPALIVE = UNKNOWN;
  * @cvalue TCP_KEEPIDLE
  */
 const TCP_KEEPIDLE = UNKNOWN;
+#endif
+#ifdef TCP_KEEPINTVL
 /**
  * @var int
  * @cvalue TCP_KEEPINTVL
  */
 const TCP_KEEPINTVL = UNKNOWN;
+#endif
+#ifdef TCP_KEEPCNT
 /**
  * @var int
  * @cvalue TCP_KEEPCNT
